@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# Logs
+*.log
+csv_output/aeroguard.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large Data Files (20+ GB - too large for GitHub)
+# Store these separately or use cloud storage
+csv_output/data/*.csv
+
+# Model checkpoints (use Git LFS for these if needed)
+# Commented out for now - will use Git LFS
+# csv_output/models/*.pth
+# csv_output/models/*.pkl
+
+# Temporary files
+*.tmp
+*.temp
+csv_output/audit_reports/*.png
+csv_output/models/training_results.png
