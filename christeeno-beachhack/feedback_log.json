@@ -1,0 +1,18 @@
+[
+  {
+    "timestamp": "2026-01-31T23:21:23.193166",
+    "diagnosis": "CRITICAL FAILURE",
+    "anomaly_score": -0.017431690333215788,
+    "jrr_efficiency": 95.6711232810059,
+    "accepted": true,
+    "comments": ""
+  },
+  {
+    "timestamp": "2026-01-31T23:25:57.339197",
+    "diagnosis": "CRITICAL FAILURE",
+    "anomaly_score": -0.01878512697848267,
+    "jrr_efficiency": 95.69138711403832,
+    "accepted": false,
+    "comments": "Verification Script Test Rejection"
+  }
+]

@@ -1,0 +1,33 @@
+
+# Python internals
+__pycache__/
+*.py[cod]
+*.so
+.ipynb_checkpoints/
+
+# Virtual Environment
+myvenv/
+venv/
+env/
+
+# Large Data & Output Files
+csv_output/
+data/
+*.mdb
+
+# Notebooks
+Experiment 1.ipynb
+Experiment 2.ipynb
+
+# Generated Test Artifacts
+*.txt
+*_output.json
+src/demo_alert_data.json
+*.png
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env

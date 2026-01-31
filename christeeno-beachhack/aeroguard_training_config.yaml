@@ -1,0 +1,53 @@
+experiment_name: "AeroGuard_Diagnostic_Integration"
+model_name: "AntiGravity_Core_V1"
+
+training_objective:
+  goal: "Correlate real-time 3D spatial anomalies with causal diagnostic strings."
+  prediction_target: "Predict structural flickering or lag as a precursor to hardware failures."
+
+dataset_mapping:
+  input_a:
+    type: "Visual/Coordinate Data"
+    source: "Aircraft Wireframe Mesh Nodes"
+    focus_areas:
+      - "Flaps"
+      - "Rudder"
+  input_b:
+    type: "Diagnostic Telemetry"
+    source: "RAI Causal Logic Logs"
+    indicators:
+      - "FLIGHT_CONTROL_LOGIC"
+  target_variables:
+    - name: "AMM_27_50_00_Correlation"
+      description: "Correlate 75% probability markers with flap/rudder degree offsets."
+    - name: "Latency_Detection"
+      description: "Identify refresh rate drop (flickering) triggering '1 Active Alert' state."
+
+optimization_logic:
+  reward_function:
+    positive:
+      condition: "Correct identification of 1.5° flap deviation matching visual stutter."
+      weight: "High"
+    negative:
+      condition: "Ghosting or false positive alerts during 'Steady State'."
+      penalty: "High"
+
+features:
+  mechanical_offset:
+    data_points:
+      - "Flap 1.5 deg"
+      - "Rudder 3.2 deg"
+    utility: "Defines 'Normal vs. Abnormal' mesh state."
+  probability_index:
+    threshold: "75% Confidence"
+    trigger: "3D visual alert"
+  system_context:
+    version: "v1.51.3"
+    utility: "Performance benchmark baseline"
+
+next_steps:
+  data_preparation:
+    - "Extract JSON logs correlating with video timestamps."
+    - "Define 'Steady State' (10 minutes of non-flickering telemetry)."
+  validation:
+    - "Test prediction of Active Alert banner before visual lag."
