@@ -8,6 +8,8 @@ import {
   getMaintenanceAction,
   calculateDQI
 } from '@/data/mockFlightData';
+import { detectSystemErrors } from '@/utils/errorDetection';
+import type { SystemError } from '@/types/aviation';
 
 interface UseFlightDataReturn {
   // Current data
@@ -116,7 +118,7 @@ export function useFlightData(): UseFlightDataReturn {
     // --- INTEGRATION: Poll Requestly API ---
     const fetchBackendDiagnosis = async () => {
       try {
-        const response = await fetch('https://api.aeroguard.local/diagnosis');
+        const response = await fetch('http://localhost:8000/diagnosis');
         if (response.ok) {
           const report = await response.json();
           console.log("📡 Backend Diagnosis Received:", report);
@@ -128,34 +130,93 @@ export function useFlightData(): UseFlightDataReturn {
               affectedEngine: 2 // Determined by parsing logical root cause
             });
 
+            // Extract causal chain from backend (e.g., ["HYDY", "FLAP", "VIB"])
+            const causalChain = report.causal_chain || ['HYDY', 'FLAP', 'VIB'];
+            const confidence = Math.round((report.confidence || 0.88) * 100);
+
+            // Map causal chain to feature importance (root cause has highest responsibility)
+            const featureImportance = causalChain.map((feature: string, index: number) => ({
+              feature,
+              responsibility: index === 0 ? 75 : index === 1 ? 15 : 10
+            })).slice(0, 3);
+
             // Map backend diagnosis to XAI Insight
             setXaiInsight({
-              failureProbability: 95, // High confidence on crisis
+              failureProbability: confidence,
               primaryCause: report.diagnosis_details.root_cause_diagnosis,
               explanation: report.diagnosis_details.evidence_summary,
-              featureImportance: [
-                { feature: 'FLAP', responsibility: 75 },
-                { feature: 'VIB', responsibility: 15 },
-                { feature: 'EGT', responsibility: 10 }
-              ]
+              featureImportance
             });
 
             setMaintenanceAction({
               ammReference: report.diagnosis_details.maintenance_action.amm_reference,
-              partNumber: "ACT-FLAP-787-01", // Fallback / Simulated
-              partName: "Flap Actuator Assembly",
+              partNumber: report.diagnosis_details.maintenance_action.parts_required?.[0] || "ACT-FLAP-787-01",
+              partName: report.diagnosis_details.maintenance_action.parts_required?.[0]?.includes('HYD')
+                ? "Hydraulic Pump Assembly"
+                : "Flap Actuator Assembly",
               stockCount: 2,
-              estimatedCost: 12500
+              estimatedCost: report.diagnosis_details.maintenance_action.estimated_hours
+                ? Math.round(report.diagnosis_details.maintenance_action.estimated_hours * 3500)
+                : 12500
             });
 
             // Only auto-switch if not already there
             if (viewMode === 'dashboard') {
               setViewMode('diagnostic');
             }
+          } else {
+            // Clear alerts when system returns to normal
+            setSystemState({
+              status: 'nominal',
+              message: 'All systems nominal',
+              affectedEngine: undefined
+            });
+            setXaiInsight(null);
+            setMaintenanceAction(null);
           }
+        } else {
+          console.warn("⚠️ Backend returned non-OK status:", response.status);
         }
       } catch (e) {
-        // Ignore fetch errors (Requestly not set up yet)
+        console.error("❌ Backend API Error:", e);
+        // Fallback: Use frontend error detection to populate XAI
+        if (currentRow) {
+          const systemHealth = getSystemHealthFromRow(currentRow);
+          const errors = detectSystemErrors(systemHealth);
+          if (errors.length > 0) {
+            const criticalError = errors.find((err: SystemError) => err.severity === 'critical') || errors[0];
+            console.log("🔄 Using frontend error detection as fallback:", criticalError);
+
+            setSystemState({
+              status: 'crisis',
+              message: `DETECTED: ${criticalError.message}`,
+              affectedEngine: 2
+            });
+
+            setXaiInsight({
+              failureProbability: criticalError.severity === 'critical' ? 85 : 65,
+              primaryCause: criticalError.message,
+              explanation: `Frontend error detection identified ${criticalError.category}. ${criticalError.ammReference ? `Refer to ${criticalError.ammReference} for maintenance procedures.` : 'Awaiting backend analysis.'}`,
+              featureImportance: [
+                { feature: criticalError.category.split('_')[0], responsibility: 75 },
+                { feature: 'SYS', responsibility: 15 },
+                { feature: 'ENV', responsibility: 10 }
+              ]
+            });
+
+            setMaintenanceAction({
+              ammReference: criticalError.ammReference || "AMM-PENDING",
+              partNumber: "PART-TBD",
+              partName: criticalError.category.replace(/_/g, ' '),
+              stockCount: 0,
+              estimatedCost: 0
+            });
+
+            if (viewMode === 'dashboard') {
+              setViewMode('diagnostic');
+            }
+          }
+        }
       }
     };
 
@@ -209,7 +270,7 @@ export function useFlightData(): UseFlightDataReturn {
       clearInterval(interval);
       clearInterval(backendInterval);
     };
-  }, [isPlaying, flightData, checkSystemState, viewMode]);
+  }, [isPlaying, flightData, viewMode]);
 
   // Toggle playback
   const togglePlayback = useCallback(() => {
