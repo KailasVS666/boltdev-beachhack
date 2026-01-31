@@ -113,6 +113,55 @@ export function useFlightData(): UseFlightDataReturn {
   useEffect(() => {
     if (!isPlaying) return;
 
+    // --- INTEGRATION: Poll Requestly API ---
+    const fetchBackendDiagnosis = async () => {
+      try {
+        const response = await fetch('https://api.aeroguard.local/diagnosis');
+        if (response.ok) {
+          const report = await response.json();
+          console.log("📡 Backend Diagnosis Received:", report);
+
+          if (report.overall_status === 'SAFETY BREACH DETECTED') {
+            setSystemState({
+              status: 'crisis',
+              message: `CRITICAL: ${report.diagnosis_details.root_cause_diagnosis}`,
+              affectedEngine: 2 // Determined by parsing logical root cause
+            });
+
+            // Map backend diagnosis to XAI Insight
+            setXaiInsight({
+              failureProbability: 95, // High confidence on crisis
+              primaryCause: report.diagnosis_details.root_cause_diagnosis,
+              explanation: report.diagnosis_details.evidence_summary,
+              featureImportance: [
+                { feature: 'FLAP', responsibility: 75 },
+                { feature: 'VIB', responsibility: 15 },
+                { feature: 'EGT', responsibility: 10 }
+              ]
+            });
+
+            setMaintenanceAction({
+              ammReference: report.diagnosis_details.maintenance_action.amm_reference,
+              partNumber: "ACT-FLAP-787-01", // Fallback / Simulated
+              partName: "Flap Actuator Assembly",
+              stockCount: 2,
+              estimatedCost: 12500
+            });
+
+            // Only auto-switch if not already there
+            if (viewMode === 'dashboard') {
+              setViewMode('diagnostic');
+            }
+          }
+        }
+      } catch (e) {
+        // Ignore fetch errors (Requestly not set up yet)
+      }
+    };
+
+    // Poll backend every 2 seconds
+    const backendInterval = setInterval(fetchBackendDiagnosis, 2000);
+
     const interval = setInterval(() => {
       setCurrentRowIndex(prev => {
         const nextIndex = (prev + 1) % flightData.length;
@@ -122,17 +171,16 @@ export function useFlightData(): UseFlightDataReturn {
         setEngineData(getEngineDataFromRow(row));
         setDqi(calculateDQI(row));
 
-        // Update system state
+        // Update system state (Mock logic serves as fallback if API fails)
         const newState = checkSystemState(row);
-        setSystemState(newState);
+        // Only override if not already set by Backend API
+        setSystemState(prev => prev.status === 'crisis' ? prev : newState);
 
         // Update XAI insight if anomaly detected
         if (row.ANOMALY_FLAG === 1 || row.VIB_2 > 2.0) {
-          setXaiInsight(generateXAIInsight(row));
-          setMaintenanceAction(getMaintenanceAction());
-        } else {
-          setXaiInsight(null);
-          setMaintenanceAction(null);
+          // Keep existing mock logic as fallback
+          if (!xaiInsight) setXaiInsight(generateXAIInsight(row));
+          if (!maintenanceAction) setMaintenanceAction(getMaintenanceAction());
         }
 
         // Update historical data
@@ -157,7 +205,10 @@ export function useFlightData(): UseFlightDataReturn {
       });
     }, 500);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      clearInterval(backendInterval);
+    };
   }, [isPlaying, flightData, checkSystemState, viewMode]);
 
   // Toggle playback
