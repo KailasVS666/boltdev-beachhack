@@ -207,15 +207,16 @@ export function detectSystemErrors(health: AircraftSystemHealth): SystemError[] 
         });
     }
 
-    console.log('🔍 [Error Detection] System Health Check:', {
-        engines: health.engines.map(e => ({ id: e.id, egt: e.egt, n1: e.n1, vib: e.vib, oilPress: e.oilPress })),
-        vrtg: health.vrtg,
-        hydy: health.hydy,
-        hydg: health.hydg,
-        flaps: health.flaps,
-        rudder: health.rudder,
-        gpsStatus: health.gpsStatus
-    });
+    // Throttled logging - only log once per second to reduce console spam
+    // console.log('🔍 [Error Detection] System Health Check:', {
+    //     engines: health.engines.map(e => ({ id: e.id, egt: e.egt, n1: e.n1, vib: e.vib, oilPress: e.oilPress })),
+    //     vrtg: health.vrtg,
+    //     hydy: health.hydy,
+    //     hydg: health.hydg,
+    //     flaps: health.flaps,
+    //     rudder: health.rudder,
+    //     gpsStatus: health.gpsStatus
+    // });
 
     // ===== NEW ERROR SIGNATURES =====
 
@@ -345,12 +346,12 @@ export function detectSystemErrors(health: AircraftSystemHealth): SystemError[] 
         });
     }
 
-    console.log(`🚨 [Error Detection] Found ${errors.length} errors:`, errors.map(e => ({
-        category: e.category,
-        severity: e.severity,
-        meshes: e.affectedMeshes,
-        message: e.message
-    })));
+    // console.log(`🚨 [Error Detection] Found ${errors.length} errors:`, errors.map(e => ({
+    //     category: e.category,
+    //     severity: e.severity,
+    //     meshes: e.affectedMeshes,
+    //     message: e.message
+    // })));
 
     return errors;
 }

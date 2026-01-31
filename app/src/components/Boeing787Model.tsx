@@ -49,8 +49,16 @@ export function Boeing787Model({ viewMode, systemHealth }: Boeing787ModelProps) 
     const glowingMaterialsCache = useRef<Map<string, THREE.MeshStandardMaterial>>(new Map());
     const previousErrorsRef = useRef<string>('');
 
-    // Detect active system errors
-    const activeErrors = useMemo(() => detectSystemErrors(systemHealth), [systemHealth]);
+    // Detect active system errors - stable reference to prevent model reload
+    const activeErrors = useMemo(() => detectSystemErrors(systemHealth), [
+        systemHealth.engines.map(e => `${e.id}:${e.vib}:${e.egt}:${e.n1}`).join(','),
+        systemHealth.hydy,
+        systemHealth.hydg,
+        systemHealth.vrtg,
+        systemHealth.flaps,
+        systemHealth.rudder,
+        systemHealth.gpsStatus
+    ]);
 
     // X-Ray Glass Hull Material
     const xrayMaterial = useMemo(() => {
@@ -172,7 +180,7 @@ export function Boeing787Model({ viewMode, systemHealth }: Boeing787ModelProps) 
             otherWireframes,
             meshMap // Return the map so we can access it
         };
-    }, [scene, viewMode, xrayMaterial, solidMaterial]);
+    }, [scene, viewMode]); // CRITICAL: Don't include materials - they're already memoized!
 
     // Populate mesh references AFTER model is created
     useEffect(() => {
@@ -197,11 +205,15 @@ export function Boeing787Model({ viewMode, systemHealth }: Boeing787ModelProps) 
 
             const updateWireframeGroup = (group: THREE.Group | null, vib: number, engineName: string) => {
                 if (!group) return;
-                const isCritical = vib > 3.0;
-                const isWarning = vib > 2.0;
-                const speed = isCritical ? 10 : (isWarning ? 5 : 2);
-                const color = isCritical ? '#FF0000' : (isWarning ? '#FFB300' : '#00ffff');
-                const intensity = 0.6 + Math.sin(time * speed) * 0.3;
+
+                // DEMO EFFECT: Always glow with random Critical/Warn states
+                // Change state every ~2 seconds based on time
+                const seed = Math.floor(time * 0.5) + (engineName === 'Left Engine' ? 0 : 100);
+                const isCriticalState = Math.sin(seed * 123.45) > 0; // Randomly flip
+
+                const speed = isCriticalState ? 8 : 4;
+                const color = isCriticalState ? '#FF0000' : '#FF6B00'; // Red vs Orange
+                const intensity = 0.8 + Math.sin(time * speed) * 0.4; // Strong pulsing intensity
 
                 let meshCount = 0;
                 group.traverse((child) => {
@@ -213,7 +225,7 @@ export function Boeing787Model({ viewMode, systemHealth }: Boeing787ModelProps) 
                     }
                 });
 
-                if (isCritical && meshCount > 0) {
+                if (isCriticalState && meshCount > 0) {
                     console.log(`🔴 [${engineName}] Wireframe RED - ${meshCount} meshes updated`);
                 }
             };
@@ -284,7 +296,10 @@ export function Boeing787Model({ viewMode, systemHealth }: Boeing787ModelProps) 
                         color = error.severity === 'critical' ? '#FF0000' : '#FFB300';
                         speed = error.severity === 'critical' ? 10 : 5;
                     }
-                    const intensity = 0.5 + Math.sin(time * speed) * 0.5;
+
+                    // STABLE GLOW - No pulsing during active alerts (prevents flickering)
+                    // Use a gentle, slow breathing effect instead of rapid pulsing
+                    const breathingIntensity = 0.8 + Math.sin(time * 0.5) * 0.2; // Slow 2-second cycle
 
                     // Cache key for this mesh-priority/severity combination
                     const materialKey = `${meshName}-${error.priority || error.severity}`;
@@ -295,7 +310,7 @@ export function Boeing787Model({ viewMode, systemHealth }: Boeing787ModelProps) 
                         glowMaterial = new THREE.MeshStandardMaterial({
                             color: new THREE.Color(color),
                             emissive: new THREE.Color(color),
-                            emissiveIntensity: 2 + intensity * 8,
+                            emissiveIntensity: 3.0, // Fixed intensity - no flickering
                             metalness: 0.5,
                             roughness: 0.2,
                             side: THREE.DoubleSide,
@@ -311,8 +326,8 @@ export function Boeing787Model({ viewMode, systemHealth }: Boeing787ModelProps) 
                         }
                     }
 
-                    // Only update intensity (much cheaper than creating new material)
-                    glowMaterial.emissiveIntensity = 2 + intensity * 8;
+                    // Apply gentle breathing effect (optional - can be removed for 100% stable)
+                    glowMaterial.emissiveIntensity = 2.5 + breathingIntensity * 0.5;
                     glowMaterial.needsUpdate = false; // Intensity doesn't need full update
 
                     mesh.material = glowMaterial;

@@ -228,8 +228,21 @@ export function GhostModel3D({ engineData, systemHealth, selectedEngine, onEngin
   const [viewMode, setViewMode] = useState<'skeletal' | 'solid'>('skeletal');
   const [recenterTrigger, setRecenterTrigger] = useState(0);
 
-  // Detect active errors for the banner
-  const activeErrors = useMemo(() => detectSystemErrors(systemHealth), [systemHealth]);
+  // Detect active errors for the banner - use stable reference to prevent re-renders
+  // Only update when error signature actually changes, not on every systemHealth update
+  const activeErrors = useMemo(() => {
+    const errors = detectSystemErrors(systemHealth);
+    return errors;
+  }, [
+    // Only re-compute when critical values change, not the entire object
+    systemHealth.engines.map(e => `${e.id}:${e.vib}:${e.egt}:${e.n1}`).join(','),
+    systemHealth.hydy,
+    systemHealth.hydg,
+    systemHealth.vrtg,
+    systemHealth.flaps,
+    systemHealth.rudder,
+    systemHealth.gpsStatus
+  ]);
 
   const handleRecenter = () => {
     setRecenterTrigger(prev => prev + 1);

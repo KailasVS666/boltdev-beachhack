@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { FlightDataRow, EngineData, SystemState, ViewMode, XAIInsight, MaintenanceAction } from '@/types/aviation';
 import {
   generateMockFlightData,
@@ -75,6 +75,14 @@ export function useFlightData(): UseFlightDataReturn {
   // Historical data buffer (last 50 rows for trend analysis)
   const [historicalData, setHistoricalData] = useState<FlightDataRow[]>([flightData[0]]);
 
+  // Freeze lock to prevent XAI updates on minor value changes
+  const xaiFrozenRef = useRef(false);
+
+  // Error persistence tracking - prevent blinking
+  const errorCountRef = useRef(0);
+  const noErrorCountRef = useRef(0);
+  const ERROR_THRESHOLD = 4; // Must see error 4 times (2 seconds) before showing
+
   // Check system state based on current data
   const checkSystemState = useCallback((row: FlightDataRow): SystemState => {
     // Check for crisis conditions first
@@ -115,7 +123,7 @@ export function useFlightData(): UseFlightDataReturn {
   useEffect(() => {
     if (!isPlaying) return;
 
-    // --- INTEGRATION: Poll Requestly API ---
+    // === ML MODE: Backend Integration ENABLED ===
     const fetchBackendDiagnosis = async () => {
       try {
         const response = await fetch('http://localhost:8000/diagnosis');
@@ -127,20 +135,17 @@ export function useFlightData(): UseFlightDataReturn {
             setSystemState({
               status: 'crisis',
               message: `CRITICAL: ${report.diagnosis_details.root_cause_diagnosis}`,
-              affectedEngine: 2 // Determined by parsing logical root cause
+              affectedEngine: 2
             });
 
-            // Extract causal chain from backend (e.g., ["HYDY", "FLAP", "VIB"])
             const causalChain = report.causal_chain || ['HYDY', 'FLAP', 'VIB'];
             const confidence = Math.round((report.confidence || 0.88) * 100);
 
-            // Map causal chain to feature importance (root cause has highest responsibility)
             const featureImportance = causalChain.map((feature: string, index: number) => ({
               feature,
               responsibility: index === 0 ? 75 : index === 1 ? 15 : 10
             })).slice(0, 3);
 
-            // Map backend diagnosis to XAI Insight
             setXaiInsight({
               failureProbability: confidence,
               primaryCause: report.diagnosis_details.root_cause_diagnosis,
@@ -160,63 +165,19 @@ export function useFlightData(): UseFlightDataReturn {
                 : 12500
             });
 
-            // Only auto-switch if not already there
+            xaiFrozenRef.current = true;
+
             if (viewMode === 'dashboard') {
               setViewMode('diagnostic');
             }
-          } else {
-            // Clear alerts when system returns to normal
-            setSystemState({
-              status: 'nominal',
-              message: 'All systems nominal',
-              affectedEngine: undefined
-            });
-            setXaiInsight(null);
-            setMaintenanceAction(null);
           }
+          // NOTE: Don't clear on normal status - keep data stable for demo
         } else {
           console.warn("⚠️ Backend returned non-OK status:", response.status);
         }
       } catch (e) {
         console.error("❌ Backend API Error:", e);
-        // Fallback: Use frontend error detection to populate XAI
-        if (currentRow) {
-          const systemHealth = getSystemHealthFromRow(currentRow);
-          const errors = detectSystemErrors(systemHealth);
-          if (errors.length > 0) {
-            const criticalError = errors.find((err: SystemError) => err.severity === 'critical') || errors[0];
-            console.log("🔄 Using frontend error detection as fallback:", criticalError);
-
-            setSystemState({
-              status: 'crisis',
-              message: `DETECTED: ${criticalError.message}`,
-              affectedEngine: 2
-            });
-
-            setXaiInsight({
-              failureProbability: criticalError.severity === 'critical' ? 85 : 65,
-              primaryCause: criticalError.message,
-              explanation: `Frontend error detection identified ${criticalError.category}. ${criticalError.ammReference ? `Refer to ${criticalError.ammReference} for maintenance procedures.` : 'Awaiting backend analysis.'}`,
-              featureImportance: [
-                { feature: criticalError.category.split('_')[0], responsibility: 75 },
-                { feature: 'SYS', responsibility: 15 },
-                { feature: 'ENV', responsibility: 10 }
-              ]
-            });
-
-            setMaintenanceAction({
-              ammReference: criticalError.ammReference || "AMM-PENDING",
-              partNumber: "PART-TBD",
-              partName: criticalError.category.replace(/_/g, ' '),
-              stockCount: 0,
-              estimatedCost: 0
-            });
-
-            if (viewMode === 'dashboard') {
-              setViewMode('diagnostic');
-            }
-          }
-        }
+        // Fallback handled by demo mode below
       }
     };
 
@@ -237,12 +198,100 @@ export function useFlightData(): UseFlightDataReturn {
         // Only override if not already set by Backend API
         setSystemState(prev => prev.status === 'crisis' ? prev : newState);
 
-        // Update XAI insight if anomaly detected
-        if (row.ANOMALY_FLAG === 1 || row.VIB_2 > 2.0) {
-          // Keep existing mock logic as fallback
-          if (!xaiInsight) setXaiInsight(generateXAIInsight(row));
-          if (!maintenanceAction) setMaintenanceAction(getMaintenanceAction());
+        // === DEMO MODE: Static Error Scenario - Show error IMMEDIATELY and keep visible ===
+        if (nextIndex >= 5 && !xaiFrozenRef.current) {
+          console.log("🎬 [DEMO MODE] Showing persistent error scenario - ALWAYS VISIBLE");
+
+          setXaiInsight({
+            failureProbability: 75,
+            primaryCause: "Flight Control Lag Detected",
+            explanation: `System detected FLIGHT_CONTROL_LAG. Aircraft control surfaces showing delayed response. Flaps registering 2.8° lag, Rudder showing 3.2° lag. Refer to AMM 27-50-00 for maintenance procedures. Recommended action: Inspect hydraulic actuators and control linkages.`,
+            featureImportance: [
+              { feature: 'FLIGHT', responsibility: 75 },
+              { feature: 'CONTROL', responsibility: 15 },
+              { feature: 'LAG', responsibility: 10 }
+            ]
+          });
+
+          setMaintenanceAction({
+            ammReference: "AMM 27-50-00",
+            partNumber: "ACT-FLAP-787-01",
+            partName: "Flight Control Actuator Assembly",
+            stockCount: 2,
+            estimatedCost: 12500
+          });
+
+          xaiFrozenRef.current = true;
+
+          if (viewMode === 'dashboard') {
+            setViewMode('diagnostic');
+            setSelectedEngine(2);
+          }
         }
+
+        // === DEMO MODE: NEVER CLEAR - Keep data visible for entire demo ===
+        // if (nextIndex >= 200 && xaiFrozenRef.current) {
+        //   console.log("✅ [DEMO MODE] Clearing error scenario");
+        //   setXaiInsight(null);
+        //   setMaintenanceAction(null);
+        //   xaiFrozenRef.current = false;
+        // }
+
+        // === DISABLED: Error detection for demo ===
+        // Check for errors using the error detection system
+        // const systemHealth = getSystemHealthFromRow(row);
+        // const detectedErrors = detectSystemErrors(systemHealth);
+
+        // Persistence-based error handling - prevent blinking
+        // if (detectedErrors.length > 0) {
+        //   errorCountRef.current++;
+        //   noErrorCountRef.current = 0;
+
+        //   // Only show error if it persists for threshold duration
+        //   if (errorCountRef.current >= ERROR_THRESHOLD && !xaiFrozenRef.current) {
+        //     const criticalError = detectedErrors.find((err: SystemError) => err.severity === 'critical') || detectedErrors[0];
+        //     console.log("🔒 [Main Loop] Error PERSISTENT, LOCKING XAI data:", criticalError);
+
+        //     setXaiInsight({
+        //       failureProbability: criticalError.severity === 'critical' ? 85 : 65,
+        //       primaryCause: criticalError.message,
+        //       explanation: `System detected ${criticalError.category}. ${criticalError.ammReference ? `Refer to ${criticalError.ammReference} for maintenance procedures.` : 'Monitoring for additional symptoms.'}`,
+        //       featureImportance: [
+        //         { feature: criticalError.category.split('_')[0], responsibility: 75 },
+        //         { feature: criticalError.category.split('_')[1] || 'SYS', responsibility: 15 },
+        //         { feature: 'ENV', responsibility: 10 }
+        //       ]
+        //     });
+
+        //     setMaintenanceAction({
+        //       ammReference: criticalError.ammReference || "AMM-PENDING",
+        //       partNumber: "PART-TBD",
+        //       partName: criticalError.category.replace(/_/g, ' '),
+        //       stockCount: 0,
+        //       estimatedCost: 0
+        //     });
+
+        //     // LOCK the XAI - no more updates until cleared
+        //     xaiFrozenRef.current = true;
+
+        //     // Auto-switch to diagnostic view when error is first detected
+        //     if (viewMode === 'dashboard') {
+        //       setViewMode('diagnostic');
+        //       setSelectedEngine(2);
+        //     }
+        //   }
+        // } else {
+        //   noErrorCountRef.current++;
+        //   errorCountRef.current = 0;
+
+        //   // Only clear if no errors for threshold duration
+        //   if (noErrorCountRef.current >= ERROR_THRESHOLD && xaiFrozenRef.current) {
+        //     console.log("✅ [Main Loop] No errors PERSISTENT, UNLOCKING XAI");
+        //     setXaiInsight(null);
+        //     setMaintenanceAction(null);
+        //     xaiFrozenRef.current = false;
+        //   }
+        // }
 
         // Update historical data
         setHistoricalData(prev => {
@@ -264,11 +313,11 @@ export function useFlightData(): UseFlightDataReturn {
 
         return nextIndex;
       });
-    }, 500);
+    }, 1500); // DEMO MODE: Slower updates (1.5 seconds) for better readability
 
     return () => {
       clearInterval(interval);
-      clearInterval(backendInterval);
+      clearInterval(backendInterval); // ML MODE: Backend polling enabled
     };
   }, [isPlaying, flightData, viewMode]);
 
@@ -289,10 +338,33 @@ export function useFlightData(): UseFlightDataReturn {
     }
   }, []);
 
+  // Memoize systemHealth to prevent 3D model rebuilds when values don't change
+  const systemHealth = useMemo(() => {
+    if (!currentRow) return null;
+    return getSystemHealthFromRow(currentRow);
+  }, [
+    // Only recreate if actual values change
+    currentRow?.VIB_1,
+    currentRow?.VIB_2,
+    currentRow?.VIB_3,
+    currentRow?.VIB_4,
+    currentRow?.EGT_1,
+    currentRow?.EGT_2,
+    currentRow?.EGT_3,
+    currentRow?.EGT_4,
+    currentRow?.N1_1,
+    currentRow?.N1_2,
+    currentRow?.N1_3,
+    currentRow?.N1_4,
+    currentRow?.VRTG,
+    currentRow?.HYDY,
+    currentRow?.HYDG,
+  ]);
+
   return {
     currentRow,
     engineData,
-    systemHealth: currentRow ? getSystemHealthFromRow(currentRow) : null,
+    systemHealth,
     dqi,
     systemState,
     viewMode,
