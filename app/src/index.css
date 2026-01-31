@@ -1,0 +1,195 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* AeroGuard Aviation Design System */
+    --background: 222 47% 6%;
+    --foreground: 0 0% 98%;
+    --card: 222 47% 8%;
+    --card-foreground: 0 0% 98%;
+    --popover: 222 47% 8%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 187 100% 50%;
+    --primary-foreground: 222 47% 6%;
+    --secondary: 222 30% 12%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 222 30% 15%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 187 100% 50%;
+    --accent-foreground: 222 47% 6%;
+    --destructive: 351 100% 55%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 222 30% 15%;
+    --input: 222 30% 15%;
+    --ring: 187 100% 50%;
+    --radius: 4px;
+    
+    /* AeroGuard State Colors */
+    --nominal: 187 100% 50%;
+    --alert: 40 100% 50%;
+    --crisis: 351 100% 55%;
+    
+    /* Industrial Border */
+    --industrial-border: 222 30% 18%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+  }
+}
+
+@layer components {
+  /* Industrial Card Style */
+  .aviation-card {
+    @apply rounded-[4px] border border-[#1E293B] bg-[#0B1120]/80 backdrop-blur-sm;
+  }
+  
+  /* Nominal State - Cyan Glow */
+  .state-nominal {
+    @apply text-[#00E5FF];
+    text-shadow: 0 0 5px rgba(0, 229, 255, 0.5);
+  }
+  
+  /* Alert State - Amber Pulse */
+  .state-alert {
+    @apply text-[#FFB300];
+    animation: pulse-alert 2s ease-in-out infinite;
+  }
+  
+  /* Crisis State - Red Strobe */
+  .state-crisis {
+    @apply text-[#FF1744];
+    animation: strobe-crisis 0.5s ease-in-out infinite;
+  }
+  
+  /* Thermometer Gauge */
+  .thermometer-bar {
+    @apply relative overflow-hidden rounded-sm;
+    background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
+  }
+  
+  .thermometer-fill {
+    @apply absolute bottom-0 left-0 right-0 transition-all duration-500;
+    background: linear-gradient(180deg, #00E5FF 0%, #00B8D4 100%);
+  }
+  
+  .thermometer-fill.alert {
+    background: linear-gradient(180deg, #FFB300 0%, #FF8F00 100%);
+  }
+  
+  .thermometer-fill.crisis {
+    background: linear-gradient(180deg, #FF1744 0%, #D50000 100%);
+  }
+  
+  /* Terminal Window */
+  .terminal-window {
+    @apply rounded-[4px] border border-[#1E293B] bg-[#050810];
+    font-family: 'JetBrains Mono', monospace;
+  }
+  
+  /* Progress Ring */
+  .progress-ring-circle {
+    transition: stroke-dashoffset 0.35s;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+  }
+  
+  /* 3D Canvas Container */
+  .canvas-3d {
+    @apply rounded-[4px] overflow-hidden;
+    background: radial-gradient(ellipse at center, #0B1120 0%, #000000 100%);
+  }
+  
+  /* Data Value Display */
+  .data-value {
+    @apply font-mono text-sm tracking-wider;
+  }
+  
+  /* Glow Effect */
+  .glow-cyan {
+    text-shadow: 0 0 5px rgba(0, 229, 255, 0.5), 0 0 10px rgba(0, 229, 255, 0.3);
+  }
+  
+  .glow-amber {
+    text-shadow: 0 0 5px rgba(255, 179, 0, 0.5), 0 0 10px rgba(255, 179, 0, 0.3);
+  }
+  
+  .glow-red {
+    text-shadow: 0 0 5px rgba(255, 23, 68, 0.5), 0 0 10px rgba(255, 23, 68, 0.3);
+  }
+}
+
+@layer utilities {
+  /* Animation Keyframes */
+  @keyframes pulse-alert {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+  
+  @keyframes strobe-crisis {
+    0%, 100% { opacity: 1; }
+    25% { opacity: 0.3; }
+    50% { opacity: 1; }
+    75% { opacity: 0.3; }
+  }
+  
+  @keyframes slide-in-left {
+    from { transform: translateX(-100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  
+  @keyframes zoom-in {
+    from { transform: scale(0.8); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  
+  @keyframes fly-in {
+    from { 
+      transform: translateZ(-500px) scale(0.5); 
+      opacity: 0; 
+    }
+    to { 
+      transform: translateZ(0) scale(1); 
+      opacity: 1; 
+    }
+  }
+  
+  .animate-slide-in-left {
+    animation: slide-in-left 0.5s ease-out;
+  }
+  
+  .animate-zoom-in {
+    animation: zoom-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  
+  .animate-fly-in {
+    animation: fly-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0B1120;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1E293B;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
