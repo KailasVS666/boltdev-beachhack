@@ -116,7 +116,7 @@ export function useFlightData(): UseFlightDataReturn {
     // --- INTEGRATION: Poll Requestly API ---
     const fetchBackendDiagnosis = async () => {
       try {
-        const response = await fetch('https://api.aeroguard.local/diagnosis');
+        const response = await fetch('http://localhost:8000/diagnosis');
         if (response.ok) {
           const report = await response.json();
           console.log("📡 Backend Diagnosis Received:", report);
