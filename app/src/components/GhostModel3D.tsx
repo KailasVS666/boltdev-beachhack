@@ -214,7 +214,7 @@ function Scene({
         enableZoom={true}
         enableRotate={true}
         minDistance={15}
-        maxDistance={100}
+        maxDistance={300}
         target={[0, 0, 0]}
       />
 
